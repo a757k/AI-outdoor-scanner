@@ -1,52 +1,83 @@
-let detector = null;
-let supported = null;
+import * as blazeface from "@tensorflow-models/blazeface";
+import * as tf from "@tensorflow/tfjs";
+
+let model = null;
+let loadingPromise = null;
 
 export async function initFaceDetector() {
-  if (supported !== null) return supported;
-
-  if (!("FaceDetector" in window)) {
-    supported = false;
-    return false;
-  }
-
-  try {
-    detector = new window.FaceDetector({
-      fastMode: true,
-      maxDetectedFaces: 10
-    });
-
-    supported = true;
+  if (model) {
     return true;
-  } catch {
-    supported = false;
-    return false;
   }
+
+  if (loadingPromise) {
+    return loadingPromise;
+  }
+
+  loadingPromise = (async () => {
+    try {
+      await tf.ready();
+
+      await tf.setBackend("webgl");
+
+      model = await blazeface.load({
+        maxFaces: 10,
+        inputWidth: 128,
+        inputHeight: 128,
+        iouThreshold: 0.3,
+        scoreThreshold: 0.75
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Face detector initialization failed:", error);
+      model = null;
+      return false;
+    }
+  })();
+
+  return loadingPromise;
 }
 
 export async function detectFaces(video) {
-  if (!video || video.readyState < 2) return [];
+  if (!video || video.readyState < 2) {
+    return [];
+  }
 
   const ready = await initFaceDetector();
 
-  if (!ready || !detector) {
+  if (!ready || !model) {
     return [];
   }
 
   try {
-    const faces = await detector.detect(video);
+    const predictions = await model.estimateFaces(video, false);
 
-    return faces.map((face, index) => {
-      const box = face.boundingBox;
+    return predictions.map((face, index) => {
+      const topLeft = face.topLeft;
+      const bottomRight = face.bottomRight;
+
+      const x = Number(topLeft[0]);
+      const y = Number(topLeft[1]);
+
+      const width =
+        Number(bottomRight[0]) - x;
+
+      const height =
+        Number(bottomRight[1]) - y;
 
       return {
-        id: `face-${index}-${Math.round(box.x)}-${Math.round(box.y)}`,
+        id: `face-${index}-${Math.round(x)}-${Math.round(y)}`,
+
         bbox: {
-          x: box.x,
-          y: box.y,
-          width: box.width,
-          height: box.height
+          x,
+          y,
+          width,
+          height
         },
-        confidence: 0.95
+
+        confidence:
+          face.probability?.[0] ??
+          0.95
       };
     });
   } catch (error) {
@@ -56,5 +87,9 @@ export async function detectFaces(video) {
 }
 
 export function isFaceDetectorSupported() {
-  return "FaceDetector" in window;
+  return Boolean(
+    window.isSecureContext &&
+    navigator.mediaDevices &&
+    navigator.mediaDevices.getUserMedia
+  );
 }
