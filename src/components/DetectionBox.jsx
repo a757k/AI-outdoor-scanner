@@ -11,10 +11,12 @@ function DetectionBox({
   ] = detection.bbox;
 
   const videoWidth =
-    detection.videoWidth || 1280;
+    detection.videoWidth ||
+    1280;
 
   const videoHeight =
-    detection.videoHeight || 720;
+    detection.videoHeight ||
+    720;
 
   const left =
     (x / videoWidth) * 100;
