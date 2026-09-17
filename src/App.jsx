@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 
 import Scanner from "./components/Scanner";
 import BottomTabs from "./components/BottomTabs";
+import FaceScanner from "./components/FaceScanner";
 
 function App() {
   const [mode, setMode] = useState("BIG");
@@ -11,13 +12,19 @@ function App() {
     document.title = `AI Scanner — ${mode}`;
   }, [mode]);
 
+  const isFaceMode = mode === "FACE";
+
   return (
     <main className="app">
-      <Scanner
-        mode={mode}
-        cameraState={cameraState}
-        setCameraState={setCameraState}
-      />
+      {isFaceMode ? (
+        <FaceScanner />
+      ) : (
+        <Scanner
+          mode={mode}
+          cameraState={cameraState}
+          setCameraState={setCameraState}
+        />
+      )}
 
       <BottomTabs
         mode={mode}
