@@ -7,7 +7,8 @@ import React, {
 
 const Camera = forwardRef(function Camera(
   {
-    onStateChange
+    onStateChange,
+    onReady
   },
   ref
 ) {
@@ -77,6 +78,7 @@ const Camera = forwardRef(function Camera(
       }
 
       onStateChange?.("ready");
+      onReady?.();
     } catch (error) {
       console.error("Camera error:", error);
 
