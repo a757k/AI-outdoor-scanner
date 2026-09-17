@@ -5,6 +5,7 @@ import React, {
 } from "react";
 
 import Camera from "../camera/Camera";
+
 import {
   detectObjects
 } from "../ai/detector";
@@ -27,20 +28,25 @@ import DetectionBox from "./DetectionBox";
 import AlertOverlay from "./AlertOverlay";
 import StatusBar from "./StatusBar";
 
-const DETECTION_INTERVAL = 280;
+const DETECTION_INTERVAL = 350;
 
 function Scanner({
   mode,
   cameraState,
   setCameraState
 }) {
-  const cameraRef = useRef(null);
+  const cameraRef =
+    useRef(null);
 
   const trackerRef =
-    useRef(new ObjectTracker());
+    useRef(
+      new ObjectTracker()
+    );
 
   const motionRef =
-    useRef(new MotionDetector());
+    useRef(
+      new MotionDetector()
+    );
 
   const runningRef =
     useRef(true);
@@ -74,6 +80,14 @@ function Scanner({
     useRef(performance.now());
 
   useEffect(() => {
+    trackerRef.current.clear();
+
+    setDetections([]);
+
+    setAlert(null);
+  }, [mode]);
+
+  useEffect(() => {
     runningRef.current = true;
 
     let animationFrame;
@@ -84,7 +98,8 @@ function Scanner({
       }
 
       const video =
-        cameraRef.current?.getVideoElement();
+        cameraRef.current
+          ?.getVideoElement();
 
       if (video) {
         const currentMotion =
@@ -92,7 +107,9 @@ function Scanner({
             video
           );
 
-        setMotion(currentMotion);
+        setMotion(
+          currentMotion
+        );
 
         frameCountRef.current++;
 
@@ -100,16 +117,19 @@ function Scanner({
           performance.now();
 
         if (
-          now - fpsTimeRef.current >=
+          now -
+            fpsTimeRef.current >=
           1000
         ) {
           setFps(
             frameCountRef.current
           );
 
-          frameCountRef.current = 0;
+          frameCountRef.current =
+            0;
 
-          fpsTimeRef.current = now;
+          fpsTimeRef.current =
+            now;
         }
 
         if (
@@ -121,10 +141,15 @@ function Scanner({
             now;
 
           try {
-            setModelState("scanning");
+            setModelState(
+              "scanning"
+            );
 
             const rawDetections =
-              await detectObjects(video);
+              await detectObjects(
+                video,
+                mode
+              );
 
             const filtered =
               rawDetections.filter(
@@ -141,47 +166,64 @@ function Scanner({
               );
 
             const enhanced =
-              tracked.map((item) => ({
-                ...item,
+              tracked.map(
+                (item) => ({
+                  ...item,
 
-                displayName:
-                  getDisplayName(
-                    item.className
-                  ),
+                  displayName:
+                    getDisplayName(
+                      item.className
+                    ),
 
-                threat:
-                  getThreatLevel(
-                    item.className
-                  )
-              }));
+                  threat:
+                    getThreatLevel(
+                      item.className
+                    ),
 
-            setDetections(enhanced);
+                  videoWidth:
+                    video.videoWidth,
+
+                  videoHeight:
+                    video.videoHeight
+                })
+              );
+
+            setDetections(
+              enhanced
+            );
 
             checkAlerts(
               enhanced,
               currentMotion
             );
 
-            setModelState("ready");
+            setModelState(
+              "ready"
+            );
           } catch (error) {
             console.error(
               "Detection error:",
               error
             );
 
-            setModelState("error");
+            setModelState(
+              "error"
+            );
           }
         }
       }
 
       animationFrame =
-        requestAnimationFrame(loop);
+        requestAnimationFrame(
+          loop
+        );
     }
 
     loop();
 
     return () => {
-      runningRef.current = false;
+      runningRef.current =
+        false;
 
       if (animationFrame) {
         cancelAnimationFrame(
@@ -195,18 +237,49 @@ function Scanner({
     detectedObjects,
     currentMotion
   ) {
+    const person =
+      detectedObjects.find(
+        (object) =>
+          object.className ===
+            "person" &&
+          object.score >=
+            (mode === "SMALL"
+              ? 0.32
+              : 0.55)
+      );
+
+    if (person) {
+      if (
+        mode === "SMALL"
+      ) {
+        setAlert({
+          title:
+            "DISTANT HUMAN DETECTED",
+
+          message:
+            "A person was detected in the camera view."
+        });
+      }
+
+      return;
+    }
+
     const dangerous =
       detectedObjects.find(
         (object) =>
-          object.threat === "high" &&
-          object.score >= 0.55
+          object.threat ===
+            "high" &&
+          object.score >=
+            0.55
       );
 
     if (dangerous) {
       setAlert({
-        title: `${dangerous.displayName} DETECTED`,
+        title:
+          `${dangerous.displayName} DETECTED`,
+
         message:
-          "A high-priority object has been detected in the camera view."
+          "A high-priority object was detected in the camera view."
       });
 
       return;
@@ -214,8 +287,10 @@ function Scanner({
 
     if (
       currentMotion.detected &&
-      currentMotion.intensity > 0.65 &&
-      detectedObjects.length === 0
+      currentMotion.intensity >
+        0.65 &&
+      detectedObjects.length ===
+        0
     ) {
       setAlert((current) => {
         if (current) {
@@ -223,7 +298,9 @@ function Scanner({
         }
 
         return {
-          title: "UNIDENTIFIED MOVEMENT",
+          title:
+            "UNIDENTIFIED MOVEMENT",
+
           message:
             "Movement was detected, but the scanner could not confidently identify its source."
         };
@@ -238,11 +315,15 @@ function Scanner({
   const status =
     cameraState === "error"
       ? "Camera unavailable"
-      : modelState === "loading"
+      : modelState ===
+          "loading"
         ? "Loading AI model"
-        : modelState === "error"
+        : modelState ===
+            "error"
           ? "AI error"
-          : "Scanning";
+          : mode === "SMALL"
+            ? "Long-distance scan"
+            : "Scanning";
 
   return (
     <section className="scanner">
@@ -255,7 +336,8 @@ function Scanner({
         />
       </div>
 
-      {cameraState === "error" && (
+      {cameraState ===
+        "error" && (
         <div className="camera-message">
           <div className="camera-message-inner">
             <h1>
@@ -263,15 +345,19 @@ function Scanner({
             </h1>
 
             <p>
-              Allow camera access to use
-              the live AI scanner. The app
-              does not record or upload
-              photos or videos.
+              Allow camera access
+              to use the live AI
+              scanner. The app
+              does not record or
+              upload photos or
+              videos.
             </p>
 
             <button
               className="retry-button"
-              onClick={retryCamera}
+              onClick={
+                retryCamera
+              }
             >
               TRY CAMERA AGAIN
             </button>
@@ -290,7 +376,9 @@ function Scanner({
           </div>
 
           <span className="mode-label">
-            {mode} MODE
+            {mode === "SMALL"
+              ? "FAR PEOPLE"
+              : `${mode} MODE`}
           </span>
         </div>
 
@@ -304,45 +392,78 @@ function Scanner({
         />
       </div>
 
-      {detections.map((detection) => (
-        <DetectionBox
-          key={detection.id}
-          detection={detection}
-        />
-      ))}
+      {detections.map(
+        (detection) => (
+          <DetectionBox
+            key={detection.id}
+            detection={
+              detection
+            }
+          />
+        )
+      )}
 
       {motion.regions
         .slice(0, 12)
-        .map((region, index) => (
-          <div
-            key={`motion-${index}`}
-            className="detection-box movement"
-            style={{
-              left: `${region.x * 100}%`,
-              top: `${region.y * 100}%`,
-              width: `${region.width * 100}%`,
-              height: `${region.height * 100}%`,
-              opacity:
-                0.18 +
-                region.intensity * 0.35
-            }}
-          />
-        ))}
+        .map(
+          (
+            region,
+            index
+          ) => (
+            <div
+              key={`motion-${index}`}
+              className="detection-box movement"
+              style={{
+                left: `${
+                  region.x * 100
+                }%`,
+
+                top: `${
+                  region.y * 100
+                }%`,
+
+                width: `${
+                  region.width *
+                  100
+                }%`,
+
+                height: `${
+                  region.height *
+                  100
+                }%`,
+
+                opacity:
+                  0.18 +
+                  region.intensity *
+                    0.35
+              }}
+            />
+          )
+        )}
 
       <div className="bottom-info">
         <div className="scan-info">
           <strong>
-            {detections.length > 0
-              ? `${detections.length} OBJECT${
+            {detections.length >
+            0
+              ? `${detections.length} ${
+                  mode ===
+                  "SMALL"
+                    ? "PERSON"
+                    : "OBJECT"
+                }${
                   detections.length ===
                   1
                     ? ""
                     : "S"
                 }`
-              : "NO OBJECTS"}
+              : "NO PEOPLE"}
           </strong>
 
-          Live analysis
+          {mode ===
+          "SMALL"
+            ? "Long-distance analysis"
+            : "Live analysis"}
         </div>
 
         <div className="scan-info">
@@ -357,9 +478,9 @@ function Scanner({
       </div>
 
       <div className="warning-bar">
-        AI detection is an aid — absence
-        of a detection does not mean an
-        area is hazard-free.
+        AI detection is an aid —
+        no detection does not mean
+        the area is hazard-free.
       </div>
 
       {alert && (
