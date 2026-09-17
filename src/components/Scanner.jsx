@@ -78,8 +78,6 @@ function Scanner({
   const fpsTimeRef =
     useRef(performance.now());
 
-  // Prevent the same continuously detected
-  // person from repeatedly triggering alerts.
   const farPersonAlertRef =
     useRef(false);
 
@@ -89,8 +87,6 @@ function Scanner({
     setDetections([]);
     setAlert(null);
 
-    // Reset FAR PEOPLE alert state
-    // when changing scanner modes.
     farPersonAlertRef.current =
       false;
   }, [mode]);
@@ -260,9 +256,6 @@ function Scanner({
       if (
         mode === "SMALL"
       ) {
-        // Only create the alert once
-        // for the current continuous
-        // person detection.
         if (
           !farPersonAlertRef.current
         ) {
@@ -282,10 +275,6 @@ function Scanner({
       return;
     }
 
-    // No person is currently detected.
-    // This resets the alert lock so that
-    // a person who leaves and later returns
-    // can trigger a new alert.
     if (
       mode === "SMALL"
     ) {
@@ -340,6 +329,13 @@ function Scanner({
   function retryCamera() {
     cameraRef.current?.restart();
   }
+
+  const humanCount =
+    detections.filter(
+      (detection) =>
+        detection.className ===
+        "person"
+    ).length;
 
   const status =
     cameraState === "error"
@@ -419,6 +415,20 @@ function Scanner({
           }
           motion={motion}
         />
+
+        {mode === "SMALL" && (
+          <div className="human-count-panel">
+            <span className="human-count-number">
+              {humanCount}
+            </span>
+
+            <span className="human-count-label">
+              {humanCount === 1
+                ? "HUMAN DETECTED"
+                : "HUMANS DETECTED"}
+            </span>
+          </div>
+        )}
       </div>
 
       {detections.map(
@@ -473,20 +483,25 @@ function Scanner({
       <div className="bottom-info">
         <div className="scan-info">
           <strong>
-            {detections.length >
-            0
-              ? `${detections.length} ${
-                  mode ===
-                  "SMALL"
+            {mode === "SMALL"
+              ? `${humanCount} ${
+                  humanCount === 1
                     ? "PERSON"
-                    : "OBJECT"
-                }${
-                  detections.length ===
-                  1
-                    ? ""
-                    : "S"
+                    : "PEOPLE"
                 }`
-              : "NO PEOPLE"}
+              : detections.length >
+                  0
+                ? `${detections.length} ${
+                    mode === "SMALL"
+                      ? "PERSON"
+                      : "OBJECT"
+                  }${
+                    detections.length ===
+                    1
+                      ? ""
+                      : "S"
+                  }`
+                : "NO OBJECTS"}
           </strong>
 
           {mode ===
