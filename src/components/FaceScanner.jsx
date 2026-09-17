@@ -1,20 +1,34 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState
+} from "react";
+
 import Camera from "../camera/Camera";
+
 import {
   detectFaces,
   initFaceDetector,
   isFaceDetectorSupported
 } from "../ai/faceDetector";
+
 import PublicInfoPanel from "./PublicInfoPanel";
 
 export default function FaceScanner() {
   const cameraRef = useRef(null);
   const animationRef = useRef(null);
   const lastScanRef = useRef(0);
+  const scanningRef = useRef(false);
 
   const [faces, setFaces] = useState([]);
   const [cameraReady, setCameraReady] = useState(false);
   const [supported, setSupported] = useState(true);
+
+  const [videoSize, setVideoSize] = useState({
+    width: 1280,
+    height: 720
+  });
+
   const [name, setName] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
@@ -22,6 +36,13 @@ export default function FaceScanner() {
 
   useEffect(() => {
     let mounted = true;
+
+    if (!isFaceDetectorSupported()) {
+      setSupported(false);
+      return () => {
+        mounted = false;
+      };
+    }
 
     initFaceDetector().then((ok) => {
       if (mounted) {
@@ -31,35 +52,94 @@ export default function FaceScanner() {
 
     return () => {
       mounted = false;
-      cancelAnimationFrame(animationRef.current);
+
+      if (animationRef.current) {
+        cancelAnimationFrame(
+          animationRef.current
+        );
+      }
     };
   }, []);
 
   useEffect(() => {
-    if (!cameraReady) return;
+    if (!cameraReady) {
+      return;
+    }
+
+    let mounted = true;
 
     const scan = async (time) => {
-      animationRef.current = requestAnimationFrame(scan);
+      if (!mounted) {
+        return;
+      }
 
-      if (time - lastScanRef.current < 250) {
+      animationRef.current =
+        requestAnimationFrame(scan);
+
+      if (
+        time - lastScanRef.current <
+        250
+      ) {
+        return;
+      }
+
+      if (scanningRef.current) {
         return;
       }
 
       lastScanRef.current = time;
+      scanningRef.current = true;
 
-      const video = cameraRef.current;
+      try {
+        const video =
+          cameraRef.current?.getVideoElement();
 
-      if (!video) return;
+        if (!video) {
+          return;
+        }
 
-      const detected = await detectFaces(video);
+        if (
+          video.readyState < 2 ||
+          !video.videoWidth ||
+          !video.videoHeight
+        ) {
+          return;
+        }
 
-      setFaces(detected);
+        setVideoSize({
+          width: video.videoWidth,
+          height: video.videoHeight
+        });
+
+        const detected =
+          await detectFaces(video);
+
+        if (mounted) {
+          setFaces(detected);
+        }
+      } catch (error) {
+        console.error(
+          "Face scanning error:",
+          error
+        );
+      } finally {
+        scanningRef.current = false;
+      }
     };
 
-    animationRef.current = requestAnimationFrame(scan);
+    animationRef.current =
+      requestAnimationFrame(scan);
 
     return () => {
-      cancelAnimationFrame(animationRef.current);
+      mounted = false;
+
+      if (animationRef.current) {
+        cancelAnimationFrame(
+          animationRef.current
+        );
+      }
+
+      scanningRef.current = false;
     };
   }, [cameraReady]);
 
@@ -67,7 +147,10 @@ export default function FaceScanner() {
     const cleanName = name.trim();
 
     if (!cleanName) {
-      setSearchError("Enter the person's name first.");
+      setSearchError(
+        "Enter the person's name first."
+      );
+
       return;
     }
 
@@ -85,14 +168,21 @@ export default function FaceScanner() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Search failed.");
+        throw new Error(
+          data.error || "Search failed."
+        );
       }
 
       setResults(data.results || []);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Public information search error:",
+        error
+      );
+
       setSearchError(
-        error.message || "Could not search public information."
+        error.message ||
+          "Could not search public information."
       );
     } finally {
       setSearching(false);
@@ -104,6 +194,9 @@ export default function FaceScanner() {
     setResults([]);
     setSearchError("");
   }
+
+  const videoWidth = videoSize.width || 1280;
+  const videoHeight = videoSize.height || 720;
 
   return (
     <div className="face-scanner">
@@ -118,10 +211,29 @@ export default function FaceScanner() {
             key={face.id}
             className="face-box"
             style={{
-              left: `${(face.bbox.x / 1280) * 100}%`,
-              top: `${(face.bbox.y / 720) * 100}%`,
-              width: `${(face.bbox.width / 1280) * 100}%`,
-              height: `${(face.bbox.height / 720) * 100}%`
+              left: `${
+                (face.bbox.x /
+                  videoWidth) *
+                100
+              }%`,
+
+              top: `${
+                (face.bbox.y /
+                  videoHeight) *
+                100
+              }%`,
+
+              width: `${
+                (face.bbox.width /
+                  videoWidth) *
+                100
+              }%`,
+
+              height: `${
+                (face.bbox.height /
+                  videoHeight) *
+                100
+              }%`
             }}
           >
             <div className="face-label">
@@ -140,14 +252,17 @@ export default function FaceScanner() {
           {faces.length === 0
             ? "No face detected"
             : `${faces.length} face${
-                faces.length === 1 ? "" : "s"
+                faces.length === 1
+                  ? ""
+                  : "s"
               } detected`}
         </div>
       </div>
 
       {!supported && (
         <div className="face-warning">
-          Face detection is not supported by this browser.
+          Face detection is not supported
+          by this browser.
         </div>
       )}
 
@@ -160,21 +275,29 @@ export default function FaceScanner() {
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) =>
+              setName(e.target.value)
+            }
             placeholder="Enter person's name"
             autoComplete="off"
           />
 
           <button
             onClick={searchPublicInfo}
-            disabled={searching || !name.trim()}
+            disabled={
+              searching ||
+              !name.trim()
+            }
           >
-            {searching ? "SEARCHING..." : "SEARCH"}
+            {searching
+              ? "SEARCHING..."
+              : "SEARCH"}
           </button>
         </div>
 
         <div className="face-private-note">
-          Nothing about the face, name, or search is saved by this app.
+          Nothing about the face, name, or
+          search is saved by this app.
         </div>
 
         {searchError && (
@@ -184,10 +307,13 @@ export default function FaceScanner() {
         )}
 
         {results.length > 0 && (
-          <PublicInfoPanel results={results} />
+          <PublicInfoPanel
+            results={results}
+          />
         )}
 
-        {(name || results.length > 0) && (
+        {(name ||
+          results.length > 0) && (
           <button
             className="face-clear-button"
             onClick={clearSession}
