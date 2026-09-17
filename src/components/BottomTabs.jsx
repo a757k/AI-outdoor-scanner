@@ -14,6 +14,11 @@ const modes = [
   {
     id: "SMALL",
     description: "FAR PEOPLE"
+  },
+
+  {
+    id: "FACE",
+    description: "FACE"
   }
 ];
 
