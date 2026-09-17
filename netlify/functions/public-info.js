@@ -30,13 +30,13 @@ export default async (request) => {
     );
   }
 
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+  const apiKey = process.env.TAVILY_API_KEY;
 
   if (!apiKey) {
     return new Response(
       JSON.stringify({
         error:
-          "BRAVE_SEARCH_API_KEY is not configured in Netlify."
+          "TAVILY_API_KEY is not configured in Netlify."
       }),
       {
         status: 500,
@@ -48,26 +48,32 @@ export default async (request) => {
   }
 
   try {
-    const searchUrl =
-      "https://api.search.brave.com/res/v1/web/search?" +
-      new URLSearchParams({
-        q: `"${name}"`,
-        count: "10",
-        search_lang: "en"
-      });
+    const response = await fetch(
+      "https://api.tavily.com/search",
+      {
+        method: "POST",
 
-    const response = await fetch(searchUrl, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-Subscription-Token": apiKey
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+          api_key: apiKey,
+          query: `"${name}"`,
+          search_depth: "basic",
+          topic: "general",
+          max_results: 10,
+          include_answer: false,
+          include_raw_content: false,
+          include_images: false
+        })
       }
-    });
+    );
 
     if (!response.ok) {
       const text = await response.text();
 
-      console.error("Brave Search error:", text);
+      console.error("Tavily Search error:", text);
 
       return new Response(
         JSON.stringify({
@@ -84,11 +90,11 @@ export default async (request) => {
 
     const data = await response.json();
 
-    const results = (data.web?.results || [])
+    const results = (data.results || [])
       .slice(0, 10)
       .map((item) => ({
         title: item.title || "",
-        description: item.description || "",
+        description: item.content || "",
         url: item.url || ""
       }))
       .filter((item) => item.url);
