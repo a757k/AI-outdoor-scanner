@@ -25,15 +25,13 @@ const MEDIUM_OBJECTS = new Set([
   "chicken"
 ]);
 
+// SMALL is now mainly for people far away.
 const SMALL_OBJECTS = new Set([
-  "mouse"
+  "person"
 ]);
 
-export function getModeForObject(
-  objectName
-) {
-  const name =
-    objectName.toLowerCase();
+export function getModeForObject(objectName) {
+  const name = objectName.toLowerCase();
 
   if (BIG_OBJECTS.has(name)) {
     return "BIG";
@@ -54,18 +52,17 @@ export function isObjectAllowed(
   objectName,
   selectedMode
 ) {
-  const objectMode =
-    getModeForObject(objectName);
+  const name = objectName.toLowerCase();
 
-  return (
-    objectMode === selectedMode
-  );
+  if (selectedMode === "SMALL") {
+    return name === "person";
+  }
+
+  return getModeForObject(name) === selectedMode;
 }
 
-export function getDisplayName(
-  objectName
-) {
-  const specialNames = {
+export function getDisplayName(objectName) {
+  const names = {
     person: "HUMAN",
     motorcycle: "MOTORCYCLE",
     bicycle: "BICYCLE",
@@ -80,14 +77,12 @@ export function getDisplayName(
   };
 
   return (
-    specialNames[objectName] ||
+    names[objectName] ||
     objectName.toUpperCase()
   );
 }
 
-export function getThreatLevel(
-  objectName
-) {
+export function getThreatLevel(objectName) {
   const high = new Set([
     "bear",
     "elephant"
