@@ -35,8 +35,7 @@ function Scanner({
   cameraState,
   setCameraState
 }) {
-  const cameraRef =
-    useRef(null);
+  const cameraRef = useRef(null);
 
   const trackerRef =
     useRef(
@@ -79,12 +78,21 @@ function Scanner({
   const fpsTimeRef =
     useRef(performance.now());
 
+  // Prevent the same continuously detected
+  // person from repeatedly triggering alerts.
+  const farPersonAlertRef =
+    useRef(false);
+
   useEffect(() => {
     trackerRef.current.clear();
 
     setDetections([]);
-
     setAlert(null);
+
+    // Reset FAR PEOPLE alert state
+    // when changing scanner modes.
+    farPersonAlertRef.current =
+      false;
   }, [mode]);
 
   useEffect(() => {
@@ -252,16 +260,37 @@ function Scanner({
       if (
         mode === "SMALL"
       ) {
-        setAlert({
-          title:
-            "DISTANT HUMAN DETECTED",
+        // Only create the alert once
+        // for the current continuous
+        // person detection.
+        if (
+          !farPersonAlertRef.current
+        ) {
+          farPersonAlertRef.current =
+            true;
 
-          message:
-            "A person was detected in the camera view."
-        });
+          setAlert({
+            title:
+              "DISTANT HUMAN DETECTED",
+
+            message:
+              "A person was detected in the camera view."
+          });
+        }
       }
 
       return;
+    }
+
+    // No person is currently detected.
+    // This resets the alert lock so that
+    // a person who leaves and later returns
+    // can trigger a new alert.
+    if (
+      mode === "SMALL"
+    ) {
+      farPersonAlertRef.current =
+        false;
     }
 
     const dangerous =
