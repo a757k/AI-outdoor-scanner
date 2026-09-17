@@ -13,7 +13,7 @@ const modes = [
 
   {
     id: "SMALL",
-    description: "TINY"
+    description: "FAR PEOPLE"
   }
 ];
 
