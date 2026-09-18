@@ -1,3 +1,4 @@
+```jsx
 import React, {
   useEffect,
   useRef,
@@ -81,6 +82,12 @@ function Scanner({
   const farPersonAlertRef =
     useRef(false);
 
+  // Prevents the distant-human alert
+  // from immediately returning after
+  // the user closes it.
+  const farPersonDismissedRef =
+    useRef(false);
+
   useEffect(() => {
     trackerRef.current.clear();
 
@@ -88,6 +95,9 @@ function Scanner({
     setAlert(null);
 
     farPersonAlertRef.current =
+      false;
+
+    farPersonDismissedRef.current =
       false;
   }, [mode]);
 
@@ -256,8 +266,12 @@ function Scanner({
       if (
         mode === "SMALL"
       ) {
+        // Only show the alert if:
+        // 1. We haven't already alerted
+        // 2. The user hasn't dismissed it
         if (
-          !farPersonAlertRef.current
+          !farPersonAlertRef.current &&
+          !farPersonDismissedRef.current
         ) {
           farPersonAlertRef.current =
             true;
@@ -275,10 +289,16 @@ function Scanner({
       return;
     }
 
+    // No human is currently detected.
+    // Reset both flags so a future human
+    // can trigger the alert again.
     if (
       mode === "SMALL"
     ) {
       farPersonAlertRef.current =
+        false;
+
+      farPersonDismissedRef.current =
         false;
     }
 
@@ -324,6 +344,22 @@ function Scanner({
         };
       });
     }
+  }
+
+  function dismissAlert() {
+    // If this is the distant-human alert,
+    // remember that the user dismissed it.
+    // It will remain dismissed until no
+    // human is detected anymore.
+    if (
+      alert?.title ===
+      "DISTANT HUMAN DETECTED"
+    ) {
+      farPersonDismissedRef.current =
+        true;
+    }
+
+    setAlert(null);
   }
 
   function retryCamera() {
@@ -530,8 +566,8 @@ function Scanner({
       {alert && (
         <AlertOverlay
           alert={alert}
-          onClose={() =>
-            setAlert(null)
+          onClose={
+            dismissAlert
           }
         />
       )}
@@ -540,3 +576,4 @@ function Scanner({
 }
 
 export default Scanner;
+```
