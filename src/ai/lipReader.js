@@ -1,51 +1,131 @@
 /**
  * Silent Lip Reading Engine
  *
- * This module prepares mouth-movement data for a lip-reading model.
- * It does NOT use the microphone.
+ * Collects and preprocesses mouth-region frames for
+ * a visual speech recognition model.
  *
- * The actual speech-to-text model will be connected here once
- * the required browser-compatible model is added.
+ * No microphone is used.
+ *
+ * The actual VSR neural network is intentionally not
+ * fabricated here. This class prepares the video data
+ * in the format needed by the inference layer.
  */
 
-const MAX_FRAMES = 32;
+const TARGET_WIDTH = 88;
+const TARGET_HEIGHT = 88;
+
+const TARGET_FPS = 25;
+const MAX_SECONDS = 6;
+
+const MAX_FRAMES =
+  TARGET_FPS * MAX_SECONDS;
+
+const MIN_FRAMES = 25;
 
 class LipReader {
   constructor() {
     this.frames = [];
     this.isTracking = false;
     this.lastResult = null;
+
+    this.lastFrameTime = 0;
+    this.frameInterval =
+      1000 / TARGET_FPS;
   }
 
   start() {
     this.frames = [];
     this.isTracking = true;
     this.lastResult = null;
+    this.lastFrameTime = 0;
   }
 
   stop() {
     this.isTracking = false;
     this.frames = [];
+    this.lastFrameTime = 0;
   }
 
   reset() {
     this.frames = [];
     this.lastResult = null;
+    this.lastFrameTime = 0;
   }
 
   addFrame(frame) {
-    if (!this.isTracking || !frame) {
-      return;
+    if (
+      !this.isTracking ||
+      !frame
+    ) {
+      return false;
+    }
+
+    const now =
+      performance.now();
+
+    /*
+     * Keep the sequence close to
+     * the model's expected frame rate.
+     */
+    if (
+      this.lastFrameTime &&
+      now - this.lastFrameTime <
+        this.frameInterval
+    ) {
+      return false;
+    }
+
+    this.lastFrameTime = now;
+
+    const processedFrame =
+      this.prepareFrame(frame);
+
+    if (!processedFrame) {
+      return false;
     }
 
     this.frames.push({
-      ...frame,
-      timestamp: performance.now()
+      ...processedFrame,
+      timestamp: now
     });
 
-    if (this.frames.length > MAX_FRAMES) {
+    if (
+      this.frames.length >
+      MAX_FRAMES
+    ) {
       this.frames.shift();
     }
+
+    return true;
+  }
+
+  prepareFrame(frame) {
+    if (!frame.mouth) {
+      return null;
+    }
+
+    return {
+      landmarks:
+        frame.landmarks || [],
+
+      mouth: {
+        x: frame.mouth.x,
+        y: frame.mouth.y,
+        width: frame.mouth.width,
+        height: frame.mouth.height
+      },
+
+      /*
+       * These dimensions describe the
+       * normalized input expected by
+       * the visual speech pipeline.
+       */
+      targetWidth:
+        TARGET_WIDTH,
+
+      targetHeight:
+        TARGET_HEIGHT
+    };
   }
 
   getFrameCount() {
@@ -53,22 +133,57 @@ class LipReader {
   }
 
   hasEnoughFrames() {
-    return this.frames.length >= 12;
+    return (
+      this.frames.length >=
+      MIN_FRAMES
+    );
+  }
+
+  isSequenceFull() {
+    return (
+      this.frames.length >=
+      MAX_FRAMES
+    );
   }
 
   getMouthSequence() {
     return [...this.frames];
   }
 
+  getSequenceInfo() {
+    return {
+      frameCount:
+        this.frames.length,
+
+      targetWidth:
+        TARGET_WIDTH,
+
+      targetHeight:
+        TARGET_HEIGHT,
+
+      targetFps:
+        TARGET_FPS,
+
+      duration:
+        this.frames.length /
+        TARGET_FPS,
+
+      ready:
+        this.hasEnoughFrames()
+    };
+  }
+
   /*
-   * This is the model entry point.
+   * This is the inference entry point.
    *
-   * Later, the actual lip-reading neural-network model
-   * will receive the mouth-frame sequence here and return
-   * predicted words.
+   * The browser currently has no embedded VSR
+   * neural-network model. Therefore this function
+   * NEVER invents speech.
    */
   async predict() {
-    if (!this.hasEnoughFrames()) {
+    if (
+      !this.hasEnoughFrames()
+    ) {
       return {
         text: "",
         confidence: 0,
@@ -77,13 +192,27 @@ class LipReader {
     }
 
     /*
-     * No real prediction is made yet.
-     * This prevents the app from displaying fake words.
+     * The actual model must receive:
+     *
+     *   this.getMouthSequence()
+     *
+     * and return something like:
+     *
+     * {
+     *   text: "HELLO",
+     *   confidence: 0.82
+     * }
+     *
+     * before this method can produce
+     * a transcription.
      */
     return {
       text: "",
       confidence: 0,
-      status: "model-not-connected"
+      status:
+        "model-not-connected",
+      frameCount:
+        this.frames.length
     };
   }
 
