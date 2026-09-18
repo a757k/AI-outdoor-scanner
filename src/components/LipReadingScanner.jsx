@@ -8,9 +8,14 @@ import React, {
 import Camera from "../camera/Camera";
 import LipReadingOverlay from "./LipReadingOverlay";
 import LipReader from "../ai/lipReader";
+import {
+  detectMouth,
+  initMouthLandmarker
+} from "../ai/mouthLandmarker";
 
 function LipReadingScanner() {
   const cameraRef = useRef(null);
+
   const lipReaderRef = useRef(
     new LipReader()
   );
@@ -27,9 +32,28 @@ function LipReadingScanner() {
   const [confidence, setConfidence] =
     useState(0);
 
+  const [mouthDetected, setMouthDetected] =
+    useState(false);
+
+  const [mouthBox, setMouthBox] =
+    useState(null);
+
+  const [modelState, setModelState] =
+    useState("loading");
+
   useEffect(() => {
     lipReaderRef.current.start();
-    setStatus("collecting");
+
+    async function loadLandmarker() {
+      const ready =
+        await initMouthLandmarker();
+
+      setModelState(
+        ready ? "ready" : "error"
+      );
+    }
+
+    loadLandmarker();
 
     return () => {
       lipReaderRef.current.stop();
@@ -37,11 +61,21 @@ function LipReadingScanner() {
   }, []);
 
   useEffect(() => {
-    if (cameraState !== "ready") {
+    if (
+      cameraState !== "ready" ||
+      modelState !== "ready"
+    ) {
       return;
     }
 
-    const interval = setInterval(() => {
+    let running = true;
+    let busy = false;
+
+    async function analyzeFrame() {
+      if (!running || busy) {
+        return;
+      }
+
       const video =
         cameraRef.current?.getVideoElement();
 
@@ -54,42 +88,100 @@ function LipReadingScanner() {
         return;
       }
 
-      /*
-       * For now we record timing information from
-       * the live camera stream.
-       *
-       * The actual mouth-landmark extraction and
-       * neural lip-reading model will be connected
-       * after the camera pipeline is confirmed.
-       */
-      lipReaderRef.current.addFrame({
-        width: video.videoWidth,
-        height: video.videoHeight,
-        currentTime: video.currentTime
-      });
+      busy = true;
 
-      const readerStatus =
-        lipReaderRef.current.getStatus();
+      try {
+        const result =
+          await detectMouth(video);
 
-      setStatus(readerStatus);
-    }, 100);
+        if (!running) {
+          return;
+        }
+
+        if (!result) {
+          setMouthDetected(false);
+          setMouthBox(null);
+          setStatus("collecting");
+          return;
+        }
+
+        setMouthDetected(true);
+        setMouthBox(result.mouth);
+
+        /*
+         * Store the facial landmark sequence.
+         *
+         * This is the data that will eventually
+         * be fed into the real lip-reading model.
+         */
+        lipReaderRef.current.addFrame({
+          landmarks: result.landmarks,
+          mouth: result.mouth,
+          timestamp: result.timestamp
+        });
+
+        const readerStatus =
+          lipReaderRef.current.getStatus();
+
+        setStatus(readerStatus);
+      } catch (error) {
+        console.error(
+          "Lip analysis error:",
+          error
+        );
+      } finally {
+        busy = false;
+      }
+    }
+
+    const interval =
+      setInterval(
+        analyzeFrame,
+        80
+      );
 
     return () => {
+      running = false;
       clearInterval(interval);
     };
-  }, [cameraState]);
+  }, [
+    cameraState,
+    modelState
+  ]);
 
   async function handleReady() {
     setCameraState("ready");
-    setStatus("collecting");
   }
 
-  function handleCameraStateChange(state) {
+  function handleCameraStateChange(
+    state
+  ) {
     setCameraState(state);
 
     if (state === "error") {
       setStatus("idle");
     }
+  }
+
+  let displayStatus = status;
+
+  if (modelState === "loading") {
+    displayStatus =
+      "loading-model";
+  }
+
+  if (modelState === "error") {
+    displayStatus =
+      "model-error";
+  }
+
+  if (
+    modelState === "ready" &&
+    cameraState === "ready" &&
+    !mouthDetected
+  ) {
+    displayStatus =
+      "find-face";
   }
 
   return (
@@ -102,6 +194,41 @@ function LipReadingScanner() {
           }
           onReady={handleReady}
         />
+
+        {mouthBox && (
+          <div
+            className="mouth-tracking-box"
+            style={{
+              left: `${
+                (mouthBox.x /
+                  1280) *
+                100
+              }%`,
+
+              top: `${
+                (mouthBox.y /
+                  720) *
+                100
+              }%`,
+
+              width: `${
+                (mouthBox.width /
+                  1280) *
+                100
+              }%`,
+
+              height: `${
+                (mouthBox.height /
+                  720) *
+                100
+              }%`
+            }}
+          >
+            <span>
+              MOUTH
+            </span>
+          </div>
+        )}
 
         <div className="lip-reading-frame">
           <div className="lip-corner top-left" />
@@ -118,11 +245,7 @@ function LipReadingScanner() {
       <LipReadingOverlay
         text={text}
         confidence={confidence}
-        status={
-          cameraState === "error"
-            ? "idle"
-            : status
-        }
+        status={displayStatus}
       />
     </div>
   );
