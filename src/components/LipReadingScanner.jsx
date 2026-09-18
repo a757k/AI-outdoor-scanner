@@ -1,4 +1,3 @@
-```jsx
 import React, {
   useEffect,
   useRef,
@@ -20,6 +19,9 @@ function LipReadingScanner() {
     new LipReader()
   );
 
+  const predictionBusyRef =
+    useRef(false);
+
   const [cameraState, setCameraState] =
     useState("starting");
 
@@ -37,6 +39,12 @@ function LipReadingScanner() {
 
   const [mouthBox, setMouthBox] =
     useState(null);
+
+  const [videoSize, setVideoSize] =
+    useState({
+      width: 1,
+      height: 1
+    });
 
   const [modelState, setModelState] =
     useState("loading");
@@ -88,6 +96,11 @@ function LipReadingScanner() {
         return;
       }
 
+      setVideoSize({
+        width: video.videoWidth,
+        height: video.videoHeight
+      });
+
       busy = true;
 
       try {
@@ -101,29 +114,86 @@ function LipReadingScanner() {
         if (!result) {
           setMouthDetected(false);
           setMouthBox(null);
+
           setStatus("collecting");
+
           return;
         }
 
         setMouthDetected(true);
         setMouthBox(result.mouth);
 
-        /*
-         * Store the facial landmark sequence.
-         *
-         * This is the data that will eventually
-         * be fed into the real lip-reading model.
-         */
-        lipReaderRef.current.addFrame({
-          landmarks: result.landmarks,
-          mouth: result.mouth,
-          timestamp: result.timestamp
-        });
+        const frameAdded =
+          lipReaderRef.current.addFrame({
+            landmarks:
+              result.landmarks,
+
+            mouth:
+              result.mouth,
+
+            timestamp:
+              result.timestamp
+          });
 
         const readerStatus =
           lipReaderRef.current.getStatus();
 
         setStatus(readerStatus);
+
+        /*
+         * Once enough mouth frames have been
+         * collected, ask the LipReader for a
+         * prediction.
+         *
+         * The current LipReader will honestly
+         * return "model-not-connected" until
+         * the actual VSR model is attached.
+         */
+        if (
+          frameAdded &&
+          lipReaderRef.current.hasEnoughFrames() &&
+          !predictionBusyRef.current
+        ) {
+          predictionBusyRef.current =
+            true;
+
+          try {
+            const prediction =
+              await lipReaderRef.current.predict();
+
+            if (!running) {
+              return;
+            }
+
+            if (
+              prediction?.text
+            ) {
+              setText(
+                prediction.text
+              );
+
+              setConfidence(
+                prediction.confidence || 0
+              );
+            }
+
+            if (
+              prediction?.status
+            ) {
+              setStatus(
+                prediction.status
+              );
+            }
+          } catch (error) {
+            console.error(
+              "Lip prediction error:",
+              error
+            );
+          } finally {
+            predictionBusyRef.current =
+              false;
+          }
+        }
       } catch (error) {
         console.error(
           "Lip analysis error:",
@@ -134,22 +204,33 @@ function LipReadingScanner() {
       }
     }
 
+    /*
+     * MediaPipe is allowed to run more often
+     * than the LipReader's 25 FPS input limit.
+     *
+     * LipReader itself controls which frames
+     * are actually stored.
+     */
     const interval =
       setInterval(
         analyzeFrame,
-        80
+        40
       );
 
     return () => {
       running = false;
+
       clearInterval(interval);
+
+      predictionBusyRef.current =
+        false;
     };
   }, [
     cameraState,
     modelState
   ]);
 
-  async function handleReady() {
+  function handleReady() {
     setCameraState("ready");
   }
 
@@ -184,6 +265,42 @@ function LipReadingScanner() {
       "find-face";
   }
 
+  /*
+   * Convert the actual camera coordinates
+   * into percentages.
+   *
+   * This replaces the old hard-coded
+   * 1280 × 720 calculation.
+   */
+  const mouthStyle =
+    mouthBox
+      ? {
+          left: `${
+            (mouthBox.x /
+              videoSize.width) *
+            100
+          }%`,
+
+          top: `${
+            (mouthBox.y /
+              videoSize.height) *
+            100
+          }%`,
+
+          width: `${
+            (mouthBox.width /
+              videoSize.width) *
+            100
+          }%`,
+
+          height: `${
+            (mouthBox.height /
+              videoSize.height) *
+            100
+          }%`
+        }
+      : undefined;
+
   return (
     <div className="lip-reading-screen">
       <div className="lip-reading-camera">
@@ -198,31 +315,7 @@ function LipReadingScanner() {
         {mouthBox && (
           <div
             className="mouth-tracking-box"
-            style={{
-              left: `${
-                (mouthBox.x /
-                  1280) *
-                100
-              }%`,
-
-              top: `${
-                (mouthBox.y /
-                  720) *
-                100
-              }%`,
-
-              width: `${
-                (mouthBox.width /
-                  1280) *
-                100
-              }%`,
-
-              height: `${
-                (mouthBox.height /
-                  720) *
-                100
-              }%`
-            }}
+            style={mouthStyle}
           >
             <span>
               MOUTH
@@ -252,4 +345,3 @@ function LipReadingScanner() {
 }
 
 export default LipReadingScanner;
-```
