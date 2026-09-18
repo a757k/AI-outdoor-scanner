@@ -1,3 +1,4 @@
+```jsx
 import React from "react";
 
 const modes = [
@@ -19,6 +20,11 @@ const modes = [
   {
     id: "FACE",
     description: "FACE"
+  },
+
+  {
+    id: "LIP",
+    description: "LIP READ"
   }
 ];
 
@@ -54,3 +60,4 @@ function BottomTabs({
 }
 
 export default BottomTabs;
+```
