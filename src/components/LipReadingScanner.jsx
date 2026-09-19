@@ -1,3 +1,4 @@
+```jsx
 import React, {
   useEffect,
   useRef,
@@ -7,20 +8,24 @@ import React, {
 import Camera from "../camera/Camera";
 import LipReadingOverlay from "./LipReadingOverlay";
 import LipReader from "../ai/lipReader";
+
 import {
   detectMouth,
   initMouthLandmarker
 } from "../ai/mouthLandmarker";
 
 function LipReadingScanner() {
-  const cameraRef = useRef(null);
+  const cameraRef =
+    useRef(null);
 
-  const lipReaderRef = useRef(
-    new LipReader()
-  );
+  const lipReaderRef =
+    useRef(new LipReader());
 
   const predictionBusyRef =
     useRef(false);
+
+  const lastPredictionRef =
+    useRef(0);
 
   const [cameraState, setCameraState] =
     useState("starting");
@@ -49,6 +54,10 @@ function LipReadingScanner() {
   const [modelState, setModelState] =
     useState("loading");
 
+  /*
+   * Start the visual speech analyzer and
+   * load MediaPipe's face landmark model.
+   */
   useEffect(() => {
     lipReaderRef.current.start();
 
@@ -57,7 +66,9 @@ function LipReadingScanner() {
         await initMouthLandmarker();
 
       setModelState(
-        ready ? "ready" : "error"
+        ready
+          ? "ready"
+          : "error"
       );
     }
 
@@ -68,6 +79,9 @@ function LipReadingScanner() {
     };
   }, []);
 
+  /*
+   * Continuously analyze the mouth.
+   */
   useEffect(() => {
     if (
       cameraState !== "ready" ||
@@ -80,7 +94,10 @@ function LipReadingScanner() {
     let busy = false;
 
     async function analyzeFrame() {
-      if (!running || busy) {
+      if (
+        !running ||
+        busy
+      ) {
         return;
       }
 
@@ -97,8 +114,11 @@ function LipReadingScanner() {
       }
 
       setVideoSize({
-        width: video.videoWidth,
-        height: video.videoHeight
+        width:
+          video.videoWidth,
+
+        height:
+          video.videoHeight
       });
 
       busy = true;
@@ -111,15 +131,21 @@ function LipReadingScanner() {
           return;
         }
 
+        /*
+         * No face / mouth found.
+         */
         if (!result) {
           setMouthDetected(false);
           setMouthBox(null);
 
-          setStatus("collecting");
+          setStatus("find-face");
 
           return;
         }
 
+        /*
+         * Face and mouth found.
+         */
         setMouthDetected(true);
         setMouthBox(result.mouth);
 
@@ -135,68 +161,90 @@ function LipReadingScanner() {
               result.timestamp
           });
 
-        const readerStatus =
-          lipReaderRef.current.getStatus();
-
-        setStatus(readerStatus);
+        if (!frameAdded) {
+          return;
+        }
 
         /*
-         * Once enough mouth frames have been
-         * collected, ask the LipReader for a
-         * prediction.
-         *
-         * The current LipReader will honestly
-         * return "model-not-connected" until
-         * the actual VSR model is attached.
+         * Keep the UI status synchronized
+         * with the amount of collected data.
          */
+        setStatus(
+          lipReaderRef.current.getStatus()
+        );
+
+        /*
+         * Do not run interpretation on every
+         * MediaPipe frame.
+         *
+         * Once every ~500 ms is enough for the
+         * visual analysis and prevents the UI
+         * from constantly changing.
+         */
+        const now =
+          performance.now();
+
+        const enoughTimePassed =
+          now -
+            lastPredictionRef.current >
+          500;
+
         if (
-          frameAdded &&
-          lipReaderRef.current.hasEnoughFrames() &&
-          !predictionBusyRef.current
+          !lipReaderRef.current.hasEnoughFrames() ||
+          predictionBusyRef.current ||
+          !enoughTimePassed
         ) {
-          predictionBusyRef.current =
-            true;
+          return;
+        }
 
-          try {
-            const prediction =
-              await lipReaderRef.current.predict();
+        predictionBusyRef.current =
+          true;
 
-            if (!running) {
-              return;
-            }
+        lastPredictionRef.current =
+          now;
 
-            if (
-              prediction?.text
-            ) {
-              setText(
-                prediction.text
-              );
+        try {
+          const prediction =
+            await lipReaderRef.current.predict();
 
-              setConfidence(
-                prediction.confidence || 0
-              );
-            }
-
-            if (
-              prediction?.status
-            ) {
-              setStatus(
-                prediction.status
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Lip prediction error:",
-              error
-            );
-          } finally {
-            predictionBusyRef.current =
-              false;
+          if (!running) {
+            return;
           }
+
+          if (
+            prediction?.text
+          ) {
+            setText(
+              prediction.text
+            );
+
+            setConfidence(
+              Number(
+                prediction.confidence ||
+                0
+              )
+            );
+          }
+
+          if (
+            prediction?.status
+          ) {
+            setStatus(
+              prediction.status
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Visual speech prediction error:",
+            error
+          );
+        } finally {
+          predictionBusyRef.current =
+            false;
         }
       } catch (error) {
         console.error(
-          "Lip analysis error:",
+          "Mouth analysis error:",
           error
         );
       } finally {
@@ -205,11 +253,10 @@ function LipReadingScanner() {
     }
 
     /*
-     * MediaPipe is allowed to run more often
-     * than the LipReader's 25 FPS input limit.
+     * MediaPipe analysis loop.
      *
-     * LipReader itself controls which frames
-     * are actually stored.
+     * The LipReader itself limits stored
+     * frames to its target FPS.
      */
     const interval =
       setInterval(
@@ -239,19 +286,29 @@ function LipReadingScanner() {
   ) {
     setCameraState(state);
 
-    if (state === "error") {
+    if (
+      state === "error"
+    ) {
       setStatus("idle");
     }
   }
 
-  let displayStatus = status;
+  /*
+   * Determine what the overlay should show.
+   */
+  let displayStatus =
+    status;
 
-  if (modelState === "loading") {
+  if (
+    modelState === "loading"
+  ) {
     displayStatus =
       "loading-model";
   }
 
-  if (modelState === "error") {
+  if (
+    modelState === "error"
+  ) {
     displayStatus =
       "model-error";
   }
@@ -266,11 +323,10 @@ function LipReadingScanner() {
   }
 
   /*
-   * Convert the actual camera coordinates
-   * into percentages.
-   *
-   * This replaces the old hard-coded
-   * 1280 × 720 calculation.
+   * Convert camera coordinates to
+   * percentages so the mouth box stays
+   * correctly positioned at different
+   * camera resolutions.
    */
   const mouthStyle =
     mouthBox
@@ -309,7 +365,9 @@ function LipReadingScanner() {
           onStateChange={
             handleCameraStateChange
           }
-          onReady={handleReady}
+          onReady={
+            handleReady
+          }
         />
 
         {mouthBox && (
@@ -325,8 +383,11 @@ function LipReadingScanner() {
 
         <div className="lip-reading-frame">
           <div className="lip-corner top-left" />
+
           <div className="lip-corner top-right" />
+
           <div className="lip-corner bottom-left" />
+
           <div className="lip-corner bottom-right" />
         </div>
 
@@ -345,3 +406,4 @@ function LipReadingScanner() {
 }
 
 export default LipReadingScanner;
+```
