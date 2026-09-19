@@ -1,16 +1,3 @@
-/**
- * Silent Lip Reading Engine
- *
- * Collects and preprocesses mouth-region frames for
- * a visual speech recognition model.
- *
- * No microphone is used.
- *
- * The actual VSR neural network is intentionally not
- * fabricated here. This class prepares the video data
- * in the format needed by the inference layer.
- */
-
 const TARGET_WIDTH = 88;
 const TARGET_HEIGHT = 88;
 
@@ -22,6 +9,10 @@ const MAX_FRAMES =
 
 const MIN_FRAMES = 25;
 
+// Change this later when we deploy the backend.
+const LIP_READING_SERVER =
+  "http://localhost:8000";
+
 class LipReader {
   constructor() {
     this.frames = [];
@@ -29,6 +20,7 @@ class LipReader {
     this.lastResult = null;
 
     this.lastFrameTime = 0;
+
     this.frameInterval =
       1000 / TARGET_FPS;
   }
@@ -63,10 +55,6 @@ class LipReader {
     const now =
       performance.now();
 
-    /*
-     * Keep the sequence close to
-     * the model's expected frame rate.
-     */
     if (
       this.lastFrameTime &&
       now - this.lastFrameTime <
@@ -115,11 +103,6 @@ class LipReader {
         height: frame.mouth.height
       },
 
-      /*
-       * These dimensions describe the
-       * normalized input expected by
-       * the visual speech pipeline.
-       */
       targetWidth:
         TARGET_WIDTH,
 
@@ -173,13 +156,6 @@ class LipReader {
     };
   }
 
-  /*
-   * This is the inference entry point.
-   *
-   * The browser currently has no embedded VSR
-   * neural-network model. Therefore this function
-   * NEVER invents speech.
-   */
   async predict() {
     if (
       !this.hasEnoughFrames()
@@ -191,29 +167,72 @@ class LipReader {
       };
     }
 
-    /*
-     * The actual model must receive:
-     *
-     *   this.getMouthSequence()
-     *
-     * and return something like:
-     *
-     * {
-     *   text: "HELLO",
-     *   confidence: 0.82
-     * }
-     *
-     * before this method can produce
-     * a transcription.
-     */
-    return {
-      text: "",
-      confidence: 0,
-      status:
-        "model-not-connected",
-      frameCount:
-        this.frames.length
-    };
+    if (this.lastResult) {
+      return this.lastResult;
+    }
+
+    try {
+      const response =
+        await fetch(
+          `${LIP_READING_SERVER}/predict`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+
+            body: JSON.stringify({
+              frames:
+                this.getMouthSequence(),
+
+              sequence:
+                this.getSequenceInfo()
+            })
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `Server returned ${response.status}`
+        );
+      }
+
+      const result =
+        await response.json();
+
+      this.lastResult = {
+        text:
+          result.text || "",
+
+        confidence:
+          Number(
+            result.confidence || 0
+          ),
+
+        status:
+          result.status ||
+          "unknown",
+
+        frameCount:
+          result.frameCount ??
+          this.frames.length
+      };
+
+      return this.lastResult;
+    } catch (error) {
+      console.error(
+        "Lip reading server error:",
+        error
+      );
+
+      return {
+        text: "",
+        confidence: 0,
+        status: "server-offline"
+      };
+    }
   }
 
   getStatus() {
