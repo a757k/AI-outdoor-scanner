@@ -18,7 +18,7 @@ function App() {
 
   useEffect(() => {
     document.title =
-      `AI Scanner — ${mode}`;
+      `AI Scanner - ${mode}`;
   }, [mode]);
 
   const isFaceMode =
