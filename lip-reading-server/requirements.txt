@@ -1,2 +1,7 @@
-Flask
+flask
 flask-cors
+torch
+torchvision
+torchaudio
+numpy
+opencv-python
