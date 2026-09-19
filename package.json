@@ -1,4 +1,3 @@
-```json
 {
   "name": "ai-outdoor-scanner",
   "private": true,
@@ -24,4 +23,3 @@
     "vite-plugin-pwa": "^1.3.0"
   }
 }
-```
