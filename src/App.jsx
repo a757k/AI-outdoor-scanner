@@ -1,12 +1,11 @@
-```jsx
+```jsx id="4nq7px"
 import React, { useEffect, useState } from "react";
-
 import Scanner from "./components/Scanner";
 import BottomTabs from "./components/BottomTabs";
 import FaceScanner from "./components/FaceScanner";
 import RadarScanner from "./components/RadarScanner";
 
-function App() {
+export default function App() {
   const [mode, setMode] = useState("BIG");
   const [cameraState, setCameraState] = useState("starting");
 
@@ -38,6 +37,4 @@ function App() {
     </main>
   );
 }
-
-export default App;
 ```
