@@ -6,7 +6,7 @@ import BottomTabs from "./components/BottomTabs";
 import FaceScanner from "./components/FaceScanner";
 import RadarScanner from "./components/RadarScanner";
 
-const App = () => {
+function App() {
   const [mode, setMode] = useState("BIG");
   const [cameraState, setCameraState] = useState("starting");
 
@@ -37,7 +37,7 @@ const App = () => {
       />
     </main>
   );
-};
+}
 
 export default App;
 ```
