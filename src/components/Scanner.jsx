@@ -1,4 +1,3 @@
-```jsx
 import React, {
   useEffect,
   useRef,
@@ -82,9 +81,6 @@ function Scanner({
   const farPersonAlertRef =
     useRef(false);
 
-  // Prevents the distant-human alert
-  // from immediately returning after
-  // the user closes it.
   const farPersonDismissedRef =
     useRef(false);
 
@@ -266,9 +262,6 @@ function Scanner({
       if (
         mode === "SMALL"
       ) {
-        // Only show the alert if:
-        // 1. We haven't already alerted
-        // 2. The user hasn't dismissed it
         if (
           !farPersonAlertRef.current &&
           !farPersonDismissedRef.current
@@ -289,9 +282,6 @@ function Scanner({
       return;
     }
 
-    // No human is currently detected.
-    // Reset both flags so a future human
-    // can trigger the alert again.
     if (
       mode === "SMALL"
     ) {
@@ -314,7 +304,9 @@ function Scanner({
     if (dangerous) {
       setAlert({
         title:
-          `${dangerous.displayName} DETECTED`,
+          String(
+            dangerous.displayName
+          ) + " DETECTED",
 
         message:
           "A high-priority object was detected in the camera view."
@@ -347,10 +339,6 @@ function Scanner({
   }
 
   function dismissAlert() {
-    // If this is the distant-human alert,
-    // remember that the user dismissed it.
-    // It will remain dismissed until no
-    // human is detected anymore.
     if (
       alert?.title ===
       "DISTANT HUMAN DETECTED"
@@ -386,8 +374,38 @@ function Scanner({
             ? "Long-distance scan"
             : "Scanning";
 
+  const modeLabel =
+    mode === "SMALL"
+      ? "FAR PEOPLE"
+      : String(mode) + " MODE";
+
+  const scanCountText =
+    mode === "SMALL"
+      ? String(humanCount) +
+        " " +
+        (
+          humanCount === 1
+            ? "PERSON"
+            : "PEOPLE"
+        )
+      : detections.length > 0
+        ? String(detections.length) +
+          " " +
+          (
+            mode === "SMALL"
+              ? "PERSON"
+              : "OBJECT"
+          ) +
+          (
+            detections.length === 1
+              ? ""
+              : "S"
+          )
+        : "NO OBJECTS";
+
   return (
     <section className="scanner">
+
       <div className="camera-layer">
         <Camera
           ref={cameraRef}
@@ -427,7 +445,9 @@ function Scanner({
       )}
 
       <div className="top-ui">
+
         <div className="brand-row">
+
           <div className="brand">
             <span className="brand-dot" />
 
@@ -437,10 +457,9 @@ function Scanner({
           </div>
 
           <span className="mode-label">
-            {mode === "SMALL"
-              ? "FAR PEOPLE"
-              : `${mode} MODE`}
+            {modeLabel}
           </span>
+
         </div>
 
         <StatusBar
@@ -454,6 +473,7 @@ function Scanner({
 
         {mode === "SMALL" && (
           <div className="human-count-panel">
+
             <span className="human-count-number">
               {humanCount}
             </span>
@@ -463,8 +483,10 @@ function Scanner({
                 ? "HUMAN DETECTED"
                 : "HUMANS DETECTED"}
             </span>
+
           </div>
         )}
+
       </div>
 
       {detections.map(
@@ -486,26 +508,33 @@ function Scanner({
             index
           ) => (
             <div
-              key={`motion-${index}`}
+              key={
+                "motion-" +
+                String(index)
+              }
               className="detection-box movement"
               style={{
-                left: `${
-                  region.x * 100
-                }%`,
+                left:
+                  String(
+                    region.x * 100
+                  ) + "%",
 
-                top: `${
-                  region.y * 100
-                }%`,
+                top:
+                  String(
+                    region.y * 100
+                  ) + "%",
 
-                width: `${
-                  region.width *
-                  100
-                }%`,
+                width:
+                  String(
+                    region.width *
+                      100
+                  ) + "%",
 
-                height: `${
-                  region.height *
-                  100
-                }%`,
+                height:
+                  String(
+                    region.height *
+                      100
+                  ) + "%",
 
                 opacity:
                   0.18 +
@@ -517,36 +546,22 @@ function Scanner({
         )}
 
       <div className="bottom-info">
+
         <div className="scan-info">
+
           <strong>
-            {mode === "SMALL"
-              ? `${humanCount} ${
-                  humanCount === 1
-                    ? "PERSON"
-                    : "PEOPLE"
-                }`
-              : detections.length >
-                  0
-                ? `${detections.length} ${
-                    mode === "SMALL"
-                      ? "PERSON"
-                      : "OBJECT"
-                  }${
-                    detections.length ===
-                    1
-                      ? ""
-                      : "S"
-                  }`
-                : "NO OBJECTS"}
+            {scanCountText}
           </strong>
 
           {mode ===
           "SMALL"
             ? "Long-distance analysis"
             : "Live analysis"}
+
         </div>
 
         <div className="scan-info">
+
           <strong>
             {motion.detected
               ? "MOTION"
@@ -554,7 +569,9 @@ function Scanner({
           </strong>
 
           Scene movement
+
         </div>
+
       </div>
 
       <div className="warning-bar">
@@ -571,9 +588,9 @@ function Scanner({
           }
         />
       )}
+
     </section>
   );
 }
 
 export default Scanner;
-```
