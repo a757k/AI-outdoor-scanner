@@ -1,4 +1,3 @@
-```jsx
 import React, {
   useEffect,
   useState
@@ -8,6 +7,7 @@ import Scanner from "./components/Scanner";
 import BottomTabs from "./components/BottomTabs";
 import FaceScanner from "./components/FaceScanner";
 import LipReadingScanner from "./components/LipReadingScanner";
+import RadarScanner from "./components/RadarScanner";
 
 function App() {
   const [mode, setMode] =
@@ -27,9 +27,14 @@ function App() {
   const isLipMode =
     mode === "LIP";
 
+  const isRadarMode =
+    mode === "RADAR";
+
   return (
     <main className="app">
-      {isLipMode ? (
+      {isRadarMode ? (
+        <RadarScanner />
+      ) : isLipMode ? (
         <LipReadingScanner />
       ) : isFaceMode ? (
         <FaceScanner />
@@ -50,4 +55,3 @@ function App() {
 }
 
 export default App;
-```
