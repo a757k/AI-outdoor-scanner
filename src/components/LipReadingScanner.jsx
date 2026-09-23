@@ -331,29 +331,33 @@ function LipReadingScanner() {
   const mouthStyle =
     mouthBox
       ? {
-          left: `${
-            (mouthBox.x /
-              videoSize.width) *
-            100
-          }%`,
+          left:
+            (
+              (mouthBox.x /
+                videoSize.width) *
+              100
+            ) + "%",
 
-          top: `${
-            (mouthBox.y /
-              videoSize.height) *
-            100
-          }%`,
+          top:
+            (
+              (mouthBox.y /
+                videoSize.height) *
+              100
+            ) + "%",
 
-          width: `${
-            (mouthBox.width /
-              videoSize.width) *
-            100
-          }%`,
+          width:
+            (
+              (mouthBox.width /
+                videoSize.width) *
+              100
+            ) + "%",
 
-          height: `${
-            (mouthBox.height /
-              videoSize.height) *
-            100
-          }%`
+          height:
+            (
+              (mouthBox.height /
+                videoSize.height) *
+              100
+            ) + "%"
         }
       : undefined;
 
