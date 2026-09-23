@@ -1,3 +1,4 @@
+```jsx
 import React, {
   useEffect,
   useState
@@ -6,7 +7,6 @@ import React, {
 import Scanner from "./components/Scanner";
 import BottomTabs from "./components/BottomTabs";
 import FaceScanner from "./components/FaceScanner";
-import LipReadingScanner from "./components/LipReadingScanner";
 import RadarScanner from "./components/RadarScanner";
 
 function App() {
@@ -24,9 +24,6 @@ function App() {
   const isFaceMode =
     mode === "FACE";
 
-  const isLipMode =
-    mode === "LIP";
-
   const isRadarMode =
     mode === "RADAR";
 
@@ -34,8 +31,6 @@ function App() {
     <main className="app">
       {isRadarMode ? (
         <RadarScanner />
-      ) : isLipMode ? (
-        <LipReadingScanner />
       ) : isFaceMode ? (
         <FaceScanner />
       ) : (
@@ -55,3 +50,4 @@ function App() {
 }
 
 export default App;
+```
