@@ -1,5 +1,5 @@
-```jsx id="4nq7px"
 import React, { useEffect, useState } from "react";
+
 import Scanner from "./components/Scanner";
 import BottomTabs from "./components/BottomTabs";
 import FaceScanner from "./components/FaceScanner";
@@ -37,4 +37,3 @@ export default function App() {
     </main>
   );
 }
-```
